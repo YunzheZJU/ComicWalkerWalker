@@ -7,7 +7,7 @@ import os
 import sys
 
 reload(sys)
-sys.setdefaultencoding('utf-8')
+sys.setdefaultencoding('gbk')
 
 ERROR = {
     'Session': u'\n\tFail to create session'
@@ -47,6 +47,10 @@ REG = {
     'li': re.compile(r'</li>'),
     's': re.compile(r'\s+')
 }
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/65.0.3325.181 Safari/537.36'
+}
 GLOBAL = {
     'progress': 'Session'
 }
@@ -63,14 +67,19 @@ def get_progress():
 
 def try_except(func):
     def anonymous(*args, **kwargs):
-        # try:
-        return func(*args, **kwargs)
-        # except requests.exceptions.RequestException:
-        #     print u'\n\tNetwork Error! Something went wrong with your network...' \
-        #           u'\n\t网络连接不畅...'
-        # except BaseException, e:
-        #     print ERROR[get_progress()]
-        #     print u'Details: ', e
+        try:
+            return func(*args, **kwargs)
+        except requests.exceptions.RequestException, e:
+            print u'\n\tNetwork Error! Something went wrong with your network...' \
+                  u'\n\t网络连接不畅...'
+            print u'Details: ', e
+        except UnicodeDecodeError, e:
+            print u'\n\tUnicode Decode Error! Something went wrong with your system encoding...' \
+                  u'\n\t遇到了字符编码问题...'
+            print u'Details: ', e
+        except BaseException, e:
+            print ERROR[get_progress()]
+            print u'Details: ', e
 
     return anonymous
 
@@ -127,82 +136,106 @@ def fetch_detail(session, url):
     for item in it:
         title = item.group(1)
         url = item.group(2)
-        print u'Processing 《%s》...' % title
+        print u'\nProcessing 《%s》...' % title
         cid = REG['cid'].match(url).group(1)
         set_progress('Spider')
         fetch_episode(session, title, cid)
 
 
 @try_except
-def spider():
-    session = requests.session()
-    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
+def get_choice(result_list):
     while 1:
-        print u'\n\tEnter the address of detail page or viewer page in Comic-Walker. ' \
-              u'Split multiple addresses with a space.' \
-              u'Unrecognized fragments will be set as keywords.' \
-              u'\n\t输入漫画在Comic Walker中的详情页或阅读页地址，多个地址以空格分隔，不能识别的字段将被认为是搜索关键字' \
-              u'\n\tExample: https://comic-walker.com/contents/detail/KDCW_KS11000007010000_68/ ' \
-              u'https://comic-walker.com/viewer/?tw=2&dlcl=ja&cid=KDCW_KS11000007010053_68 ' \
-              u'蜘蛛ですが、なにか？'
-        address_list = REG['s'].split(raw_input(u'请：\n'))
-        for address in address_list:
-            if address == '':
-                continue
-            set_progress('Address')
-            # Filter the address
-            m = REG['detail'].match(address)
-            if m is None:
-                m = REG['viewer'].match(address)
-                if m is None:
-                    print u'\n\tType: Keyword'
-                    url = 'https://comic-walker.com/contents/search/?q=' + address
-                    resp = session.get(url, timeout=30)
-                    set_progress('Search')
-                    result_num = REG['searchResultNum'].match(resp.text).group(1)
-                    if int(result_num) == 0:
-                        print u'\n\tThere is no searching result related to keyword "%s"' \
-                              u'\n\t没有符合关键词%s的搜索结果' % ((address,) * 2)
-                    else:
-                        print u'\n\tThere are %s result(s) found (The first 25 items will be shown)' \
-                              u'\n\t搜索结果共%s项 （仅显示前25项）' % ((result_num,) * 2)
-                        it = REG['searchResult'].finditer(REG['searchResultList'].match(resp.text).group(1))
-                        result_list = []
-                        for i, item in enumerate(it):
-                            result_list.append({'href': item.group(1), 'title': item.group(2)})
-                            print u'%s: 《%s》' % (i + 1, result_list[i]['title'])
-                        while 1:
-                            choice = raw_input(
-                                u'\n\tWhich matches your target? Please enter the number before the title'
-                                u'\n\t以上哪一项是您要寻找的漫画？请输入序号\n')
-                            set_progress('Choose')
-                            choice = int(choice)
-                            if 1 <= choice <= len(result_list):
-                                print u'\n\tGet it：%s\n\t开始抓取：%s' % ((result_list[choice - 1]['title'],) * 2)
-                                break
-                            elif choice == -1:
-                                print u'\n\tStop searching' \
-                                      u'\n\t搜索中止'
-                                break
-                            else:
-                                print u'\n\tPlease enter a valid number larger than 0 while smaller than %s, ' \
-                                      u'where -1 stands for stopping searching' \
-                                      u'\n\t请输入一个大于0小于等于%s的数字，-1表示中止搜索' % ((len(result_list),) * 2)
-                        fetch_detail(session, 'https://comic-walker.com' + result_list[choice - 1]['href'])
-                else:
-                    print u'\n\tType: Viewer URL'
-                    cid = m.group(2)
-                    url = 'https://comic-walker.com' + m.group(1)
-                    resp = session.get(url, timeout=30)
-                    set_progress('Title')
-                    ctitle = REG['ctitle'].match(resp.text).group(1)
-                    etitle = REG['etitle'].match(resp.text).group(1)
-                    fetch_episode(session, ctitle + ' ' + etitle, cid)
+        choice = raw_input(
+            u'\n\tWhich matches your target? Please enter the number before the title'
+            u'\n\t以上哪一项是您要寻找的漫画？请输入序号\n')
+        set_progress('Choose')
+        try:
+            choice = int(choice)
+            if 1 <= choice <= len(result_list):
+                print u'\n\tGet it：%s\n\t开始抓取：%s' % ((result_list[choice - 1]['title'],) * 2)
+                break
+            elif choice == -1:
+                print u'\n\tStop searching' \
+                      u'\n\t搜索中止'
+                break
             else:
-                print u'\n\tType: Detail URL'
-                fetch_detail(session, 'https://comic-walker.com' + m.group(1))
-            print u'\n\tDone for %s' % address
+                print u'\n\tPlease enter a valid number larger than 0 while smaller than %s, ' \
+                      u'where -1 stands for stopping searching' \
+                      u'\n\t请输入一个大于0小于等于%s的数字，-1表示中止搜索' % ((len(result_list),) * 2)
+        except ValueError:
+            pass
+    return choice
+
+
+@try_except
+def search(session, keyword):
+    try:
+        keyword = keyword.decode('gbk')
+    except UnicodeDecodeError:
+        pass
+    url = 'https://comic-walker.com/contents/search/?q=' + keyword
+    resp = session.get(url, timeout=30)
+    set_progress('Search')
+    search_result_num = REG['searchResultNum'].match(resp.text).group(1)
+    return_value = 0
+    if int(search_result_num) == 0:
+        print u'\n\tThere is no searching result related to keyword "%s"' \
+              u'\n\t没有符合关键词%s的搜索结果' % ((keyword,) * 2)
+    else:
+        print u'\n\tThere are %s result(s) found (The first 25 items will be shown)' \
+              u'\n\t搜索结果共%s项 （仅显示前25项）' % ((search_result_num,) * 2)
+        it = REG['searchResult'].finditer(REG['searchResultList'].match(resp.text).group(1))
+        result_list = []
+        for i, item in enumerate(it):
+            result_list.append({'href': item.group(1), 'title': item.group(2)})
+            print u'%s: 《%s》' % (i + 1, result_list[i]['title'])
+        choice = get_choice(result_list)
+        return_value = 'https://comic-walker.com' + result_list[choice - 1]['href'] if choice != -1 else 0
+    return return_value
+
+
+@try_except
+def spider(session):
+    print u'\n\tEnter the address of detail page or viewer page in Comic-Walker. ' \
+          u'Split multiple addresses with a space.' \
+          u'Unrecognized fragments will be set as keywords.' \
+          u'\n\t输入漫画在Comic Walker中的详情页或阅读页地址，多个地址以空格分隔，不能识别的字段将被认为是搜索关键字' \
+          u'\n\tExample: https://comic-walker.com/contents/detail/KDCW_KS11000007010000_68/ ' \
+          u'https://comic-walker.com/viewer/?tw=2&dlcl=ja&cid=KDCW_KS11000007010053_68 ' \
+          u'蜘蛛ですが、なにか？'
+    address_list = REG['s'].split(raw_input(u'请：\n'))
+    for address in address_list:
+        if address == '':
+            continue
+        set_progress('Address')
+        # Filter the address
+        m = REG['detail'].match(address)
+        if m is None:
+            m = REG['viewer'].match(address)
+            if m is None:
+                print u'\n\tType: Keyword'
+                result = search(session, address)
+                if result:
+                    fetch_detail(session, result)
+            else:
+                print u'\n\tType: Viewer URL'
+                cid = m.group(2)
+                url = 'https://comic-walker.com' + m.group(1)
+                resp = session.get(url, timeout=30)
+                set_progress('Title')
+                ctitle = REG['ctitle'].match(resp.text).group(1)
+                etitle = REG['etitle'].match(resp.text).group(1)
+                fetch_episode(session, ctitle + ' ' + etitle, cid)
+        else:
+            print u'\n\tType: Detail URL'
+            fetch_detail(session, 'https://comic-walker.com' + m.group(1))
+        # print u'\n\tDone for %s' % address
 
 
 if __name__ == '__main__':
-    spider()
+    s = requests.session()
+    s.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
+    s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'})
+    while 1:
+        spider(s)
