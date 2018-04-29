@@ -1,6 +1,7 @@
-# ComicWalker
+# ComicWalkerWalker
 
-## A spider program written to grab the whole free comics on a specific page at comic-walker.com
+## A spider program written to grab the whole free comics on a specific page at comic-walker.com, with friendly text UI :)
+## CWW：一个用于抓取comic-walker免费漫画阅读网站的漫画的爬虫程序
 
 ## How to use
 
