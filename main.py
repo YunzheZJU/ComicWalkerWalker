@@ -36,7 +36,7 @@ REG = {
         r'^(?:https?://)?comic-walker.com(/contents/detail/(KDCW_[A-Z]{2}[0-9]{14}_[0-9]{2}))/?.*$'),
     'viewer': re.compile(
         r'^(?:https?://)?comic-walker.com(/viewer/.*?cid=(KDCW_[A-Z]{2}[0-9]{14}_[0-9]{2})).*/?.*$'),
-    'list': re.compile(r'^.*detail_backnumberList(.*?)</ul.*$', re.S),
+    'list': re.compile(r'^.*backnumberComics(.*?)</section.*$', re.S),
     'episode': re.compile(r'a.*?title="(.*?)" href="(.*?)"', re.S),
     'cid': re.compile(r'^.*cid=(KDCW_[A-Z]{2}[0-9]{14}_[0-9]{2}).*$'),
     'ctitle': re.compile(r'^.*"content_title":"(.*?)".*$', re.S),
